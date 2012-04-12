@@ -7,7 +7,7 @@ extern "C" {
 
 #include <stdio.h>
 
-int mini_eval(FILE *out, FILE *err, const char *code);
+int mini_eval(FILE *out, FILE *err, const char *command);
 void mini(FILE *in, FILE *out, FILE *err);
 
 #ifdef __cplusplus

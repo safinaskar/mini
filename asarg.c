@@ -1,9 +1,9 @@
-/*  asarg.c -- main file of the Asarg Library
+/*  asarg.c - main file of the Asarg Library
     This is snapshot of the library which is hosted on https://github.com/safinaskar/asarg
 
     Copyright (C) 2012  Askar Safin <safinaskar@mail.ru>
 
-    This file is part of the Asarg Library
+    This file is part of Asarg Library
 
     The Asarg Library is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -17,47 +17,6 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
-
-/* Features (markdown) (устарело)
-                                                                        asarg getopt argp
-**** Возможности, связанные с удобством пользоавния библиотекой
-** В качестве действия, выполняющегося при задании опции, можно задать
-Возврат определённого значения из библиотеки
-
-
-Параметры                                                               No    Yes
-Необязательные параметры                                                -     Yes
-Устаревший стиль параметров (например, `patch -p1`)                     -     ?
-Аргумент `--`                                                           Yes   Yes
-
-Длинные опции                                                           Yes   Yes
-Параметры у длинных опций вида `--prefix=/usr`                          No    Yes
-Параметры у длинных опций вида `--prefix /usr`                          No    Yes
-
-a = b (ptr, val)                                                        Yes   Yes
-
---help (yes, no, opt)                                                   Opt   No
---usage (yes, no, opt)                                                  Opt   No
---version (yes, no, opt)                                                No    No
-
-help2man работает                                                       ?     -      ?
-Несколько форм запуска                                                  No    -      Yes
-
-Парсинг операндов                                                       Yes   No
-Самостоятельный парсинг операндов                                       Yes   -
-
-Целые и вещественные типы                                               Yes   No
-Тип char                                                                Yes   No
-
-Алиасы                                                                  Yes   -
-Сообщения об ошибках                                                    Yes   Yes
-Отключение сообщений об ошибках                                         No    Yes
-
-Любой порядок (не буду реализовывать)                                   No    Yes
-Поток-save                                                              Yes   No
-Legacy-style                                                            No    Yes    Yes
-Языки                                                                   No    Yes
-*/
 
 /* Alternatives:
 Lang    Name                   Debian developer package      URL
@@ -323,7 +282,6 @@ static void process_opt(const struct asarg_opt *opt, const struct asarg_opt *opt
 	}
 }
 
-// TODO Doc: I don't modify **argvp and ***argvp
 void asarg(char ***argvp, const struct asarg_opt *opts, const char *opers_doc){
 	const struct asarg_opt default_opts[] = {
 		{0, "help", 0, 0, 0, &asarg_help},
@@ -331,12 +289,14 @@ void asarg(char ***argvp, const struct asarg_opt *opts, const char *opers_doc){
 	};
 
 	argv_0 = (*argvp)[0];
-	++*argvp;
 
 	if(argv_0 == 0){
-		fputs("A NULL argv[0] was passed through an exec system call\n", stderr);
-		exit(EXIT_FAILURE);
+		fputs("(asarg): warning: a NULL argv[0] was passed through an exec system call\n", stderr);
+		argv_0 = "(asarg)";
+		return;
 	}
+
+	++*argvp;
 
 	if(opts == 0)opts = default_opts;
 	if(opers_doc == 0)opers_doc = "";
@@ -421,7 +381,6 @@ void asarg(char ***argvp, const struct asarg_opt *opts, const char *opers_doc){
 	}
 }
 
-// TODO Doc: I don't modify **argvp and ***argvp
 void asarg_oper(char ***argvp, void *ptr, enum asarg_type type, int optional){
 	if(**argvp == 0){
 		if(!optional){
@@ -433,7 +392,6 @@ void asarg_oper(char ***argvp, void *ptr, enum asarg_type type, int optional){
 	}
 }
 
-// TODO Doc: I don't modify anything
 void asarg_end(char **const *argvp){
 	if(**argvp != 0){
 		my_errx("extra operand: %s", **argvp);

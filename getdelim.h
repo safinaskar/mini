@@ -1,5 +1,5 @@
-#ifndef _MINI_STRTOK_R
-#define _MINI_STRTOK_R
+#ifndef _MINI_GETDELIM_H
+#define _MINI_GETDELIM_H
 
 #include <stdio.h>
 #include <stddef.h>

@@ -1,5 +1,13 @@
-// TO.DO: внедрить asi (asi - полный абзац)! ! ! ! возможность отключения dl, например, для ramfs! ! ! asi-like интерфейс нужен для: /sbin/init, ramfs (протестить), оси без WIN32 и POSIX, если вдруг сделал chroot и т д
-// TO.DO внедрить все фичи c-repl
+// Первостепенные дела, если я буду публиковать:
+	// TO.DO: просто отказаться в пользу c-repl? Дополнить c-repl?
+	// TO.DO: проверить на всех нужных платформах наличие (в том числе freestanding) bool. Если есть, то заюзать
+	// TO.DO: добавить функцию "без readline"
+
+	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: я хотел добавить простой встроенный интерпретатор, мега-портируемый, в том числе на голое железо, умеющий лишь вызывать функции из hard-coded списка функций, но передумал, так как gdb круче
+
+	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: я хотел добавить glibc://dlfcn/eval.c-подобный, gdb-подобный интерфейс, встроенный простой интерпретатор, умеющий лишь вызывать функции, но произвольные, но передумал, так как дублируется gdb
+
+// TO.DO внедрить все фичи c-repl (docs: спасибо за идею, ссылка; и вообще перечислить в доках альтернативы: gdb, perl и т д)
 // TO.DO C-REPL UNDOCUMENTED: давать функциям имена, чтобы из следующих функций их можно было вызывать
 // TO.DO: Docs: протестировано на GNU/Linux'е и FreeBSD (TO.DO: надо бы ещё раз протестить, когда прога будет написана)
 	// TO.DO: Docs: если solaris /usr/include/dlfcn.h:66:13: error: expected specifier-qualifier-list before `mapobj_result_t', то:
@@ -13,6 +21,14 @@
 // TO.DO Docs: W: всё создаётся в текущей папке, она должна быть доступна, также надо убирать/чистить за mini
 // TO.DO: Docs: рассказать, рассказать, что эти функции предназначены только для отладки и потому они печатают сообщения об ошибках
 // TO.DO Docs: пригодится разработчикам ядер
+// TO.DO Docs: всё запускается в рамках одного процесса, то есть getpid выдаёт одно и то же число. Это главное отличие от простого While-Read-Do-Compile-Run
+// TO.DO Docs: пример простейшего нетката на mini_connect и т д и mini_cat; код можно выдрать и юзать отдельно
+// TO.DO: вкомпилить readline и dl внутрь mini, если это возможно! docs: рассказать, как правильно собирать с либой mini (-lreadline и т д -rdynamic)
+// TO.DO: чистить временные файлы при получении сигнала? Или не надо, т. к. это уменьшит свободу выполняемого кода? Если не чистим, то написать об этом в доках
+// TO.DO Docs: there is glibc://dlfcn/eval.c
+// TO.DO Docs: можно слинковать с мини, вызвать из проги мини, из мини обратно прогу и т д. можно вызвать mini из gdb и наоборот. можно законнектиться к процессу при помощи gdb и сделать mini
+// TO.DO Docs: нет, переменные не сохраняются (если это так)
+// TO.DO Docs: ОБЯЗАТЕЛЬНО: этот вопрос был задан дважды! Mini не сохраняет прогу, этого можно добиться с помощью tee. Рассказать, как продолжить с заданного места
 
 #ifdef __unix__
 # define _POSIX_C_SOURCE 200809L
@@ -50,8 +66,6 @@
 
 #include "mini.h"
 
-#define MAXARGS 31 /* Arguments count for .execvp */
-
 #ifdef __CYGWIN__ /* Cygwin's standard C library (Newlib) doesn't support new standards yet (as 2012), so we need this hack */
 FILE *fdopen(int fd, const char *mode);
 int mkstemp(char *template);
@@ -62,13 +76,23 @@ int fileno(FILE *stream);
 int fileno(FILE *stream);
 #endif
 
+#define MAXARGS 31 /* Arguments count for .execvp */
+
+#define DECLARATIONS "int mini_listen(const char *port);\n" \
+	"int mini_accept(const char *port);\n" \
+	"int mini_connect(const char *host, const char *port);\n" \
+	"int mini_cat(int src, int dest);\n"
+
+#define MAX_HEADERS 65536
+
 struct state{
 	FILE *in;
 	FILE *out;
 	FILE *err;
-	int done;
-	int interactive;
-	int check_errno;
+	int /* bool */ done;
+	int /* bool */ check_errno;
+	char headers[MAX_HEADERS];
+	int /* bool */ werror;
 };
 
 /*
@@ -89,37 +113,13 @@ STOP_EXCEPTIONS
 IN and FINALLY sections can view TRY objects
 */
 
-#ifdef START_EXCEPTIONS
-# undef START_EXCEPTIONS
-#endif
-#ifdef STOP_EXCEPTIONS
-# undef STOP_EXCEPTIONS
-#endif
-#ifdef TRY
-# undef TRY
-#endif
-#ifdef IN
-# undef IN
-#endif
-#ifdef FINALLY
-# undef FINALLY
-#endif
-#ifdef CATCH
-# undef CATCH
-#endif
-#ifdef END
-# undef END
-#endif
-#ifdef THROW
-# undef THROW
-#endif
-
 /* I use this variable name to avoid name conflicts. Of course, namespace would be better, but this code is not part of any package. It is just my (Askar Safin's) very own reusable code */
 
 #define START_EXCEPTIONS { int _DtQjw7AVrEPWbB2WOTFHBmIUAa6vx = 0; do{
 #define STOP_EXCEPTIONS  }while(0); }
 
 #define TRY              {
+#undef  IN /* Some environment has `IN' macro */
 #define IN               do{
 #define FINALLY          }while(0); {
 #define CATCH            } if(_DtQjw7AVrEPWbB2WOTFHBmIUAa6vx){ _DtQjw7AVrEPWbB2WOTFHBmIUAa6vx = 0;
@@ -168,8 +168,52 @@ static int my_dlerror(struct state *st, const char *message){
 }
 #endif
 
+int check_errno_func(struct state *st){
+	if(st->check_errno && errno != 0){
+		my_warn(st, "errno");
+		return -1;
+	}
+	return 0;
+}
+
+
+#ifdef __unix__
+# define HANDLE void *
+#else
+# define HANDLE HMODULE
+#endif
+
+static HANDLE load_library(struct state *st, const char *library, int /* bool */ global){
+#ifdef __unix__
+	// RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols
+	void *result = dlopen(library, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
+
+	if(my_dlerror(st, "dlopen") == -1){
+		return 0;
+	}
+
+	return result;
+#else
+	/* LoadLibrary(LPCTSTR); */
+	HMODULE result = LoadLibrary(TEXT(".\\mini-shared.dll")); /* TO.DO W: в винде не работает .l. исправить */
+
+	if(result == 0){
+		my_warnx(st, "cannot load library"); /* TO.DO W: more detail */
+		return 0;
+	}
+
+	return result;
+#endif
+}
+
 static int do_eval(struct state *st, const char *code){
 	int result = -1;
+
+	if(*(st->headers) == 0){
+		strcpy(st->headers,
+			"#include <stdio.h>\n"
+		);
+	}
 
 	START_EXCEPTIONS
 		TRY /* Source file */
@@ -182,7 +226,7 @@ static int do_eval(struct state *st, const char *code){
 				int source_fd = mkstemp(source);
 
 				if(source_fd == -1){
-					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or to fix permissions, for example \".system mount -o remount,rw /\"", source);
+					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or mount tmpfs, for example \".system mount -o remount,rw /\"", source); /* TO.DO: совет portable? */
 					THROW;
 				}
 
@@ -208,21 +252,15 @@ static int do_eval(struct state *st, const char *code){
 			TRY /* Variable `source_fp' */
 			IN /* Variable `source_fp' */
 				if(fprintf(source_fp,
-"#include <unistd.h>\n" /* TO.DO: по-нормальному сделать + портируемость */
-"#include <stdlib.h>\n"
-"#include <stdio.h>\n"
-"#include <sys/types.h>\n"
-"#include <sys/stat.h>\n"
-"#include <fcntl.h>\n"
-"#include <sys/wait.h>\n"
-"#include <signal.h>\n"
-"#include <sys/ioctl.h>\n"
-"#include <sys/mount.h>\n"
-"#include <sys/select.h>\n"
+					"%s"
+					DECLARATIONS
 #ifndef __unix__
 					"__declspec(dllexport) "
 #endif
-					"void mini_command(void){ %s; }\n", code) < 0){
+					"void mini_command(void){\n"
+					"%s;\n" /* Я сделал это отдельной строчкой, потому что "code" может начинаться на "//" */
+					"}\n", st->headers, code) < 0){
+
 					my_warn(st, "%s: cannot write to temporary source file", source);
 					THROW;
 				}
@@ -239,7 +277,7 @@ static int do_eval(struct state *st, const char *code){
 #elif defined(__unix__)
 				char shared[] = "/tmp/mini-shared-XXXXXX";
 #else
-				char shared[] = "mini-shared.dll"; /* TO.DO W: make better */
+				char shared[] = ".\\mini-shared.dll"; /* TO.DO W: make better */
 #endif
 
 #if defined(__CYGWIN__) || !defined(__unix__)
@@ -283,11 +321,21 @@ static int do_eval(struct state *st, const char *code){
 						THROW;
 					}else if(cc == 0){
 						/* Child */
-						execlp("cc", "cc", "-shared", "-Wimplicit-function-declaration", /* TO.DO: тщательно подобрать ванинги и вэррор. например, printf(5) не должно собираться из-за вэррор, чтобы не свалиться. Написать об этом в доках */
+						execlp("gcc", "gcc", "-shared", "-std=gnu99",
+
+						       /* Warnings: */ /* TO.DO Docs: тщательно подобраны варнинги и -Werror. Например, printf(5) теперь не вызывает segfault. Остальные варнинги не включены, так как это позволяет чувствовать себя свободно при написании кода */
+							st->werror ? "-Werror" : "-shared",
+
+							"-Wformat",
+							"-Wno-format-zero-length",
+							"-Wnonnull",
+							"-Wimplicit-function-declaration",
+							"-Wdiv-by-zero",
 #ifndef __CYGWIN__
-						       "-fPIC", /* TO.DO: who uses and who don't uses -fPIC? Should I use cc or gcc? */
+						       "-fPIC", /* TO.DO: who uses and who don't uses -fPIC? Should I use cc or gcc? Same for other options */
 #endif
 							"-o", shared, "-x", "c", source, (char *)0);
+
 						my_warn(st, "cc; please make sure you have \"cc\" in your PATH, for example: \".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\"");
 						exit(EXIT_FAILURE);
 					}
@@ -351,23 +399,11 @@ static int do_eval(struct state *st, const char *code){
 				/* We can delete source file now, but my exception system doesn't allow this */
 
 				TRY /* Shared object handle */
-#ifdef __unix__
-					// RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols
-					// TO.DO UNIX: global для либ и переменных! local для команд (или тоже global, если хочу, чтоб можно было вызывать одни функции из других)!
-					void *handle = dlopen(shared, RTLD_NOW | RTLD_LOCAL);
-
-					if(my_dlerror(st, "dlopen") == -1){
-						THROW;
-					}
-#else
-					/* LoadLibrary(LPCTSTR); */
-					HMODULE handle = LoadLibrary(TEXT(".\\mini-shared.dll"));
+					HANDLE handle = load_library(st, shared, 0 /* local */);
 
 					if(handle == 0){
-						my_warnx(st, "cannot load library"); /* TO.DO W: more detail */
 						THROW;
 					}
-#endif
 				IN /* Shared object handle */
 					void (*mini_command)(void);
 
@@ -393,8 +429,7 @@ static int do_eval(struct state *st, const char *code){
 
 					(*mini_command)();
 
-					if(st->check_errno && errno != 0){
-						my_warn(st, "errno");
+					if(check_errno_func(st) == -1){
 						THROW;
 					}
 
@@ -434,15 +469,23 @@ static int do_eval(struct state *st, const char *code){
 /* TO.DO: more detail */
 static void help(struct state *st){
 	fprintf(st->out,
-		".h, h, help Help\n"
 		".q, q, quit, exit Quit\n"
+		".h, h, help This help\n"
+		".i <HEADER>|\"HEADER\"\n"
+		".l LIBRARY\n"
+		".p EXPRESSION Print\n"
 		"\n"
-		"Small functions:\n" /* TO.DO Docs: ну то есть редкие */
+		"Small metacommands:\n" /* TO.DO Docs: ну то есть редкие */
 		".errno+\n"
 		".errno-\n"
-		".signal+ Notice about catched signals\n" /* TO.DO: сделать по-нормальному? signal-? */
+		".signal+ Notice about catched signals\n" /* TO.DO: сделать по-нормальному? signal-? Notice/Ignore_all/Reset_defaults? */
+		".werror+\n"
+		".werror-\n"
 		"\n"
-		"Functions for /sbin/init (and for other strange environments):\n" /* TO.DO Docs: функций избыточно много. Просто на всякий случай. Что-то может понадобиться */
+		"C functions:\n"
+		DECLARATIONS
+		"\n"
+		"Metacommands for /sbin/init (and for other strange environments):\n" /* TO.DO Docs: функций избыточно много. Просто на всякий случай. Что-то может понадобиться */
 		".execvp FILE [ARGV]... (maximal arguments count including argv[0]: %d)\n" /* TO.DO W: как это работает на винде? */
 		".setenv NAME VALUE\n" /* TO.DO W: как это работает на винде? */
 		".system COMMAND\n"
@@ -453,32 +496,26 @@ static void help(struct state *st){
 	MAXARGS);
 }
 
-// TO.DO: функция -- полный абзац; я даже не думал об инклудах и портируемости
+// TO.DO: функция - полный абзац; я даже не думал об инклудах и портируемости
 static void sighandler(int signum){
 	fprintf(stdout, "mini: got signal %d\n", signum);
 }
 
-static int eval(struct state *st, const char *code){
+static int eval(struct state *st, const char *command){
 	int result = -1;
 
 	char *tokens;
 
 	{
-		size_t size = strlen(code);
+		size_t size = strlen(command);
 		tokens = (char *)malloc(size + 1);
-		memcpy(tokens, code, size + 1);
+		memcpy(tokens, command, size + 1);
 	}
 
 	char *save_ptr;
 	const char *token = _mini_strtok_r(tokens, " ", &save_ptr);
 
 	if(token != 0){
-#ifdef __unix__
-		if(st->interactive){
-			add_history(code);
-		}
-#endif
-
 		if(token[0] == '.'){
 			if(strcmp(token, ".q") == 0){
 				st->done = 1;
@@ -486,18 +523,71 @@ static int eval(struct state *st, const char *code){
 			}else if(strcmp(token, ".h") == 0){
 				help(st);
 				result = 0; /* TO.DO Docs: если сделал chroot и т д, то ты сам дурак. Вообще тут полно способов отстрелить себе ногу. Когда делаете exec(...) или .execvp и т д из функции, никто чистить не будет. С форками нужно быть крайне аккуратным */
+			}else if(strcmp(token, ".i") == 0){ /* TODO Docs: вы сами должны чесаться по поводу того, где ищет gcc хидеры (следить за pwd и т д) */
+				const char *header = _mini_strtok_r(0, " ", &save_ptr);
+				int len;
+				if(header == 0 || (len = strlen(header)) < 3 || !((header[0] == '<' && header[len - 1] == '>') || (header[0] == '\"' && header[len - 1] == '\"'))){
+					my_warnx(st, "usage: .i <HEADER>|\"HEADER\"");
+				}else{
+					if(strlen(st->headers) + strlen("#include ") + strlen(header) + 1 /* '\n' */ + 1 /* '\0' */ > MAX_HEADERS){
+						my_warnx(st, ".i: too many headers or too long names of headers");
+					}else{
+						strcat(st->headers, "#include ");
+						strcat(st->headers, header);
+						strcat(st->headers, "\n");
+						result = 0;
+					}
+				}
+			}else if(strcmp(token, ".l") == 0){
+				const char *library = _mini_strtok_r(0, " ", &save_ptr);
+				if(library == 0){
+					my_warnx(st, "usage: .l LIBRARY");
+				}else{
+					/* We don't need to check return value, because load_library prints error message automatically */
+					if(load_library(st, library, 1 /* global */) != 0){
+						result = 0;
+					}
+				}
+			}else if(strcmp(token, ".p") == 0){
+				/* WARN! We assume behavior of this version of strtok_r (taken from Gnulib) */
+				const char *expression = save_ptr + strspn(save_ptr, " ");
+				if(*expression == 0){
+					my_warnx(st, "usage: .p EXPRESSION");
+				}else{
+					/* TO.DO: errors */
+					/* TO.DO: temporary file */
+					/* TO.DO: перенаправить ввод, вывод и т д */
+					FILE *commands = fopen("/tmp/mini-commands.gdb", "w");
+					fprintf(commands, "attach %d\nprint %s\n", getpid(), expression);
+					fclose(commands);
+					if(st->check_errno){
+						errno = 0;
+					}
+					system("gdb -batch -x /tmp/mini-commands.gdb 2>&1 | grep -v '^[0-9/]'");
+					check_errno_func(st); /* TO.DO: this is hack! */
+					result = 0;
+				}
 			}else if(strcmp(token, ".errno+") == 0){
 				st->check_errno = 1; /* TO.DO Docs: успешные функции могут менять errno! */
+				result = 0;
 			}else if(strcmp(token, ".errno-") == 0){
 				st->check_errno = 0;
+				result = 0;
 			}else if(strcmp(token, ".signal+") == 0){
-				/* TO.DO: фрагмент -- полный абзац; я даже не думал об инклудах и портируемости */
+				/* TO.DO: фрагмент - полный абзац; я даже не думал об инклудах и портируемости */
 				/* TO.DO Docs: сигналы нужно перевыставлять после их прихода */
 				for(int i = 1; i <= 32; ++i){
 					if(signal(i, &sighandler) == SIG_ERR){ // bad function
 						fprintf(st->err, "mini: cannot set signal handler for signal %d: %s\n", i, strerror(errno));
 					}
 				}
+				result = 0;
+			}else if(strcmp(token, ".werror+") == 0){
+				st->werror = 1;
+				result = 0;
+			}else if(strcmp(token, ".werror-") == 0){
+				st->werror = 0;
+				result = 0;
 			}else if(strcmp(token, ".execvp") == 0){
 				const char *file = _mini_strtok_r(0, " ", &save_ptr);
 				if(file == 0){
@@ -523,11 +613,13 @@ static int eval(struct state *st, const char *code){
 			}else if(strcmp(token, ".setenv") == 0){
 				const char *name  = _mini_strtok_r(0, " ", &save_ptr);
 				const char *value = _mini_strtok_r(0, " ", &save_ptr);
-				if(name == 0 || value == 0 || _mini_strtok_r(0, " ", &save_ptr) != 0){
+				if(name == 0 || value == 0){
 					my_warnx(st, "usage: .setenv NAME VALUE");
 				}else{
 					if(setenv(name, value, 1 /* Overwrite */) == -1){
 						my_warn(st, ".setenv %s %s", name, value);
+					}else{
+						result = 0;
 					}
 				}
 			}else if(strcmp(token, ".system") == 0){
@@ -536,7 +628,16 @@ static int eval(struct state *st, const char *code){
 				if(*command == 0){
 					my_warnx(st, "usage: .system COMMAND");
 				}else{
-					system(command);
+					int status = system(command);
+					if(status == -1){
+						my_warn(st, ".system %s", command);
+					}else{
+						if(WIFEXITED(status) && WEXITSTATUS(status) == 127){
+							my_warnx(st, ".system %s: system(...) returned 127, shell is probably unavailable", command);
+						}else{
+							result = 0;
+						}
+					}
 				}
 			}else{
 				my_warnx(st, "%s: unknown metacommand", token);
@@ -550,10 +651,10 @@ static int eval(struct state *st, const char *code){
 					help(st);
 					result = 0;
 				}else{
-					result = do_eval(st, code);
+					result = do_eval(st, command);
 				}
 			}else{
-				result = do_eval(st, code);
+				result = do_eval(st, command);
 			}
 		}
 	}
@@ -562,10 +663,11 @@ static int eval(struct state *st, const char *code){
 	return result;
 }
 
-int mini_eval(FILE *out, FILE *err, const char *code){
+/* TODO Docs: состояние не запоминается (т. к. не хочу переусложнять) */
+int mini_eval(FILE *out, FILE *err, const char *command){
 	struct state st = {0, out, err};
 
-	return eval(&st, code);
+	return eval(&st, command);
 }
 
 // TO.DO: разобраться с работой с сигналами в readline
@@ -573,14 +675,14 @@ int mini_eval(FILE *out, FILE *err, const char *code){
 void mini(FILE *in, FILE *out, FILE *err){
 	struct state st = {in, out, err};
 
-	st.interactive = (isatty(fileno(st.in)) && isatty(fileno(st.out)));
+	int /* bool */ interactive = (isatty(fileno(st.in)) && isatty(fileno(st.out)));
 
-	if(st.interactive){
-		fputs("Welcome to Mini -- C read-eval-print loop. Type `.h' for help. Type `.q' to quit\n", st.out);
+	if(interactive){
+		fputs("Welcome to Mini - C read-eval-print loop. Type `.h' for help. Type `.q' to quit\n", st.out);
 	}
 
 #ifdef __unix__
-	if(st.interactive){
+	if(interactive){
 		rl_instream  = st.in;
 		rl_outstream = st.out;
 		using_history();
@@ -593,7 +695,12 @@ void mini(FILE *in, FILE *out, FILE *err){
 				break;
 			}
 
+			if(*buffer != 0 && *buffer != ' '){
+				add_history(buffer);
+			}
+
 			eval(&st, buffer);
+
 			free(buffer);
 		}
 	}else
@@ -604,7 +711,7 @@ void mini(FILE *in, FILE *out, FILE *err){
 
 		while(!st.done){
 #ifndef __unix__
-			if(st.interactive){
+			if(interactive){
 				fputs("mini> ", st.out);
 				fflush(st.out);
 			}
@@ -613,7 +720,7 @@ void mini(FILE *in, FILE *out, FILE *err){
 
 			if(len == -1){
 #ifndef __unix__
-				if(st.interactive){
+				if(interactive){
 					fputs(".q\n", st.out);
 				}
 #endif

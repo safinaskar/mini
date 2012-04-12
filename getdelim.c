@@ -1,4 +1,4 @@
-/* getdelim.c --- Implementation of replacement getdelim function (Gnulib).
+/* getdelim.c - Implementation of replacement getdelim function (Gnulib).
    Copyright (C) 1994, 1996-1998, 2001, 2003, 2005-2011 Free Software
    Foundation, Inc.
 

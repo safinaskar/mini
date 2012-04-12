@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 1 /* OK */
+#define _POSIX_C_SOURCE 1
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,4 +34,6 @@ int main(int argc, char *argv[]){
 	asarg_end(&argv);
 
 	mini(use((int)in_fd, stdin, "r"), use((int)out_fd, stdout, "w"), use((int)err_fd, stderr, "w"));
+
+	return 0;
 }

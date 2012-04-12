@@ -1,4 +1,4 @@
-/*  asarg.h -- main header of the Asarg Library
+/*  asarg.h - main header of the Asarg Library
     This is snapshot of the library which is hosted on https://github.com/safinaskar/asarg
 
     Copyright (C) 2012  Askar Safin <safinaskar@mail.ru>

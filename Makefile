@@ -25,13 +25,17 @@ getdelim.o: getdelim.c getdelim.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c getdelim.c
 strtok_r.o: strtok_r.c strtok_r.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c strtok_r.c
+tcp.o: tcp.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c tcp.c
+util.o: util.c
+	$(CC) $(CPPFLAGS) $(CFLAGS) -c util.c
 mini.o: mini.c mini.h getdelim.h strtok_r.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c mini.c
 asarg.o: asarg.c asarg.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c asarg.c
 main.o: main.c mini.h asarg.h
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c main.c
-mini: main.o mini.o getdelim.o strtok_r.o asarg.o
-	$(CC) $(LDFLAGS) -o mini main.o mini.o getdelim.o strtok_r.o asarg.o -ldl -lreadline
-libmini.a: mini.o getdelim.o strtok_r.o
-	rm -f libmini.a && $(AR) $(ARFLAGS) libmini.a mini.o getdelim.o # TO.DO: -ldl -lreadline могут требовать др. либ + их надо подключать при компиляции своих прог
+mini: main.o mini.o getdelim.o strtok_r.o tcp.o util.o asarg.o
+	$(CC) -rdynamic $(LDFLAGS) -o mini main.o mini.o getdelim.o strtok_r.o tcp.o util.o asarg.o -ldl -lreadline # TO.DO: -rdynamic работает только на gcc?
+libmini.a: mini.o getdelim.o strtok_r.o tcp.o util.o
+	rm -f libmini.a && $(AR) $(ARFLAGS) libmini.a mini.o getdelim.o strtok_r.o tcp.o util.o # TO.DO: -ldl -lreadline могут требовать др. либ + их надо подключать при компиляции своих прог
