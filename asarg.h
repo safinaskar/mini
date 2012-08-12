@@ -1,9 +1,9 @@
 /*  asarg.h - main header of the Asarg Library
-    This is snapshot of the library which is hosted on https://github.com/safinaskar/asarg
 
     Copyright (C) 2012  Askar Safin <safinaskar@mail.ru>
 
     This file is part of the Asarg Library
+    This is snapshot of the library. See lastest version of the library on https://github.com/safinaskar/asarg
 
     The Asarg Library is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -51,17 +51,17 @@ struct asarg_opt{
 	const char        *doc;
 	void              *ptr;
 	int                val;
-	void             (*func)(void);
+	void             (*func)(int val); /* TODO: функция не вызывается для параметров */
 	enum asarg_type    param;
 	const char        *param_doc;
-	int                optional; /* In fact, this is bool */
+	int /* bool */     optional;
 };
 
 void asarg(char ***argvp, const struct asarg_opt *opts, const char *opers_doc);
-void asarg_oper(char ***argvp, void *ptr, enum asarg_type type, int optional);
+void asarg_oper(char ***argvp, void *ptr, enum asarg_type type, int /* bool */ optional);
 void asarg_end(char **const *argvp);
 
-void asarg_help(void);
+void asarg_help(int unused);
 
 #ifdef __cplusplus
 }

@@ -18,6 +18,8 @@
 
 #include <string.h>
 
+#include "strtok_r.h"
+
 /* Parse S into tokens separated by characters in DELIM.
    If S is NULL, the saved pointer in SAVE_PTR is used as
    the next starting point.  For example:

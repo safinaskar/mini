@@ -1,7 +1,12 @@
 // Первостепенные дела, если я буду публиковать:
 	// TO.DO: просто отказаться в пользу c-repl? Дополнить c-repl?
-	// TO.DO: проверить на всех нужных платформах наличие (в том числе freestanding) bool. Если есть, то заюзать
 	// TO.DO: добавить функцию "без readline"
+
+	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: есть 4 способа сделать что-то вроде интерпретатора Си (представить proof of concept всех 4-х способов??) (показать примеры всех способов) (сводная таблица способов):
+		// полноценный интерпретор Си, сложный в написании, тяжёлый в размерах, имеет все фичи (не зависит от gcc и gdb, понимает полноценный Си, не юзает временные файлы, а значит, работает в самых неприхотливых окружениях, типа r/o fs и /sbin/init, портируем), все остальные способы имеют меньше этих фич
+		// mini
+		// asi (см. ниже)
+		// dlfcn/eval.c
 
 	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: я хотел добавить простой встроенный интерпретатор, мега-портируемый, в том числе на голое железо, умеющий лишь вызывать функции из hard-coded списка функций, но передумал, так как gdb круче
 
@@ -20,15 +25,23 @@
 // TO.DO Docs: W: нужно, чтоб cl был в environment
 // TO.DO Docs: W: всё создаётся в текущей папке, она должна быть доступна, также надо убирать/чистить за mini
 // TO.DO: Docs: рассказать, рассказать, что эти функции предназначены только для отладки и потому они печатают сообщения об ошибках
-// TO.DO Docs: пригодится разработчикам ядер
 // TO.DO Docs: всё запускается в рамках одного процесса, то есть getpid выдаёт одно и то же число. Это главное отличие от простого While-Read-Do-Compile-Run
 // TO.DO Docs: пример простейшего нетката на mini_connect и т д и mini_cat; код можно выдрать и юзать отдельно
 // TO.DO: вкомпилить readline и dl внутрь mini, если это возможно! docs: рассказать, как правильно собирать с либой mini (-lreadline и т д -rdynamic)
 // TO.DO: чистить временные файлы при получении сигнала? Или не надо, т. к. это уменьшит свободу выполняемого кода? Если не чистим, то написать об этом в доках
-// TO.DO Docs: there is glibc://dlfcn/eval.c
 // TO.DO Docs: можно слинковать с мини, вызвать из проги мини, из мини обратно прогу и т д. можно вызвать mini из gdb и наоборот. можно законнектиться к процессу при помощи gdb и сделать mini
 // TO.DO Docs: нет, переменные не сохраняются (если это так)
 // TO.DO Docs: ОБЯЗАТЕЛЬНО: этот вопрос был задан дважды! Mini не сохраняет прогу, этого можно добиться с помощью tee. Рассказать, как продолжить с заданного места
+	// TO.DO Docs: но ещё более важный вопрос, который всех интересует: почему переменные не сохраняются между командами?
+// TO.DO: ошибки .i не репортятся и необратимы
+// TO.DO Docs: пример с fork/exec и с fork в терминале
+// TO.DO: собрать с readline даже под виндой!
+
+// TO.DO: "mini> .p mini_connect("irc.tambov.ru", "7770")
+// $1 = 3
+// mini: errno: Network is unreachable" - mini_connect должен чистить за собой errno (или какое-то другое решение)
+
+// TO.DO: сделать полноценное прогание? Чтоб можно было на ходу создавать функции?
 
 #ifdef __unix__
 # define _POSIX_C_SOURCE 200809L
@@ -44,6 +57,7 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#include <limits.h>
 #include <errno.h>
 
 #ifdef __unix__
@@ -76,12 +90,12 @@ int fileno(FILE *stream);
 int fileno(FILE *stream);
 #endif
 
-#define MAXARGS 31 /* Arguments count for .execvp */
-
 #define DECLARATIONS "int mini_listen(const char *port);\n" \
 	"int mini_accept(const char *port);\n" \
 	"int mini_connect(const char *host, const char *port);\n" \
 	"int mini_cat(int src, int dest);\n"
+
+#define MAX_ARGS 4096 /* Max count of arguments for .execlp */
 
 #define MAX_HEADERS 65536
 
@@ -106,9 +120,10 @@ START_EXCEPTIONS
 		if(write(fd, "bar", 3) == -1)THROW;
 	FINALLY
 		if(close(fd) == -1)THROW;
-	// CATCH is not required
 	END
 STOP_EXCEPTIONS
+
+All is required
 
 IN and FINALLY sections can view TRY objects
 */
@@ -122,7 +137,6 @@ IN and FINALLY sections can view TRY objects
 #undef  IN /* Some environment has `IN' macro */
 #define IN               do{
 #define FINALLY          }while(0); {
-#define CATCH            } if(_DtQjw7AVrEPWbB2WOTFHBmIUAa6vx){ _DtQjw7AVrEPWbB2WOTFHBmIUAa6vx = 0;
 #define END              } if(_DtQjw7AVrEPWbB2WOTFHBmIUAa6vx)break; }
 
 #define THROW            { _DtQjw7AVrEPWbB2WOTFHBmIUAa6vx = 1; break; }
@@ -226,7 +240,7 @@ static int do_eval(struct state *st, const char *code){
 				int source_fd = mkstemp(source);
 
 				if(source_fd == -1){
-					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or mount tmpfs, for example \".system mount -o remount,rw /\"", source); /* TO.DO: совет portable? */
+					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or mount tmpfs, for example \".system /bin/mount -o remount,rw /\"; error message", source); /* TO.DO: совет portable? */
 					THROW;
 				}
 
@@ -322,8 +336,10 @@ static int do_eval(struct state *st, const char *code){
 					}else if(cc == 0){
 						/* Child */
 						execlp("gcc", "gcc", "-shared", "-std=gnu99",
+							"-O0", /* Для компиляторов, отличных от gcc. Они могут включать оптимизацию по умолчанию, а это замедляет компиляцию */
+							"-s", /* Аналогично. Возможно, такая опция требуется даже для gcc, я точно не знаю */
 
-						       /* Warnings: */ /* TO.DO Docs: тщательно подобраны варнинги и -Werror. Например, printf(5) теперь не вызывает segfault. Остальные варнинги не включены, так как это позволяет чувствовать себя свободно при написании кода */
+							/* Warnings: */ /* TO.DO Docs: тщательно подобраны варнинги и -Werror. Например, printf(5) теперь не вызывает segfault. Остальные варнинги не включены, так как это позволяет чувствовать себя свободно при написании кода */
 							st->werror ? "-Werror" : "-shared",
 
 							"-Wformat",
@@ -332,11 +348,11 @@ static int do_eval(struct state *st, const char *code){
 							"-Wimplicit-function-declaration",
 							"-Wdiv-by-zero",
 #ifndef __CYGWIN__
-						       "-fPIC", /* TO.DO: who uses and who don't uses -fPIC? Should I use cc or gcc? Same for other options */
+							"-fPIC", /* TO.DO: who uses and who don't uses -fPIC? Should I use cc or gcc? Same for other options */
 #endif
 							"-o", shared, "-x", "c", source, (char *)0);
 
-						my_warn(st, "cc; please make sure you have \"cc\" in your PATH, for example: \".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\"");
+						my_warn(st, "cannot run gcc; please make sure you have \"gcc\" in your PATH, for example: \".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\"; error message");
 						exit(EXIT_FAILURE);
 					}
 #else
@@ -486,14 +502,14 @@ static void help(struct state *st){
 		DECLARATIONS
 		"\n"
 		"Metacommands for /sbin/init (and for other strange environments):\n" /* TO.DO Docs: функций избыточно много. Просто на всякий случай. Что-то может понадобиться */
-		".execvp FILE [ARGV]... (maximal arguments count including argv[0]: %d)\n" /* TO.DO W: как это работает на винде? */
+		".execvp FILE [ARGV]...\n" /* TO.DO W: как это работает на винде? */
 		".setenv NAME VALUE\n" /* TO.DO W: как это работает на винде? */
 		".system COMMAND\n"
 		"\n"
 		"/sbin/init example:\n"
 		".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\n" /* Standard Debian PATH */
-		".system mount -o remount,rw /\n",
-	MAXARGS);
+		".system mount -o remount,rw /\n"
+	);
 }
 
 // TO.DO: функция - полный абзац; я даже не думал об инклудах и портируемости
@@ -550,6 +566,7 @@ static int eval(struct state *st, const char *command){
 				}
 			}else if(strcmp(token, ".p") == 0){
 				/* WARN! We assume behavior of this version of strtok_r (taken from Gnulib) */
+				/* TO.DO: не работает в /sbin/init */
 				const char *expression = save_ptr + strspn(save_ptr, " ");
 				if(*expression == 0){
 					my_warnx(st, "usage: .p EXPRESSION");
@@ -593,10 +610,10 @@ static int eval(struct state *st, const char *command){
 				if(file == 0){
 					my_warnx(st, "usage: .execvp FILE [ARGV]...");
 				}else{
-					char *args[MAXARGS + 1];
+					char *args[MAX_ARGS + 1];
 					int i = 0;
 					for(;;){
-						if(i == MAXARGS + 1){
+						if(i == MAX_ARGS + 1){
 							my_warnx(st, ".execvp: too many arguments");
 							break;
 						}
