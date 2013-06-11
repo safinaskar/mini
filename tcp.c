@@ -48,7 +48,7 @@ static void _tcp_warnx(const char *func, const char *format, ...){
 	vfprintf(stderr, format, ap);
 	va_end(ap);
 
-	putc('\n', stderr);
+	fputc('\n', stderr);
 }
 
 /* Написано на C89, чтобы можно было легко копировать куда-нибудь */
@@ -177,7 +177,7 @@ int mini_connect(const char *host, const char *port){
 		}
 	}
 
-	tcp_warn("%s:%s: all addresses returned by getaddrinfo failed, last socket(...) or connect(...) failed with the following reason", host, port); /* После "the following message" будет добавлен strerror */
+	tcp_warn("%s:%s: all addresses returned by getaddrinfo failed, last socket(...) or connect(...) failed with the following reason", host, port); /* После "the following reason" будет добавлен strerror */
 
 	close(result); /* <unistd.h> */
 	freeaddrinfo(ai);

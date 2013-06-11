@@ -117,7 +117,7 @@ static void my_errx(const char *format, ...){
 	vfprintf(stderr, format, ap);
 	va_end(ap);
 
-	putc('\n', stderr);
+	fputc('\n', stderr);
 	exit(EXIT_FAILURE);
 }
 

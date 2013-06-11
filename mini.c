@@ -1,19 +1,32 @@
 // Первостепенные дела, если я буду публиковать:
 	// TO.DO: просто отказаться в пользу c-repl? Дополнить c-repl?
-	// TO.DO: добавить функцию "без readline"
+	// TO.DO: как на UNIX, так и на Windows возможно как скомпилировать с readline, так и без него? Также вкл/откл при запуске? Не нашёл readline при запуске -> работает без него?
+		// TO.DO: возможно, readline всё-таки нужен, т. к. rlwrap имеет недостатки (у него куча опций для работы с ситуацией, когда прожка spawns pagers)
 
-	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: есть 4 способа сделать что-то вроде интерпретатора Си (представить proof of concept всех 4-х способов??) (показать примеры всех способов) (сводная таблица способов):
+	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: есть 4 способа сделать что-то вроде интерпретатора Си (способа не четыре, нужно почётче отклассифицировать способы) (представить proof of concept всех 4-х способов??) (показать существующие примеры всех способов) (сводная таблица способов) (ultimate c interpreter manual, с кучей примеров):
 		// полноценный интерпретор Си, сложный в написании, тяжёлый в размерах, имеет все фичи (не зависит от gcc и gdb, понимает полноценный Си, не юзает временные файлы, а значит, работает в самых неприхотливых окружениях, типа r/o fs и /sbin/init, портируем), все остальные способы имеют меньше этих фич
+			// 1.1. резрешать функции с помощью hardcoded списка функций
+			// 1.2. с помощью dlopen
 		// mini
+			// eval.c в этой папке идеально подходит для учебных целей. И он уже полностью готов, его не надо "ещё раз" смотреть перед публикацией
 		// asi (см. ниже)
-		// dlfcn/eval.c
+		// dlfcn/eval.c в glibc (там коммент что-то вроде "you don't need ever to know what is this", добавить этот коммент в доки)
+			// otcc компилит си в память и резолвит символы с помощью dlsym (obfusc. tiny cc by f. bellard)
+				// otcc скорее ближе к gcc-подходу, чем к подходу с истинной интерпретацией
+			// а что если dlfcn/eval.c форт есть? или лисп и т д?
+		// использовать gdb (как прогу, как либу, написать аналог gdb)
+	// TO.DO: Иметь mini, не запускающий процессов всё-таки здорово (т. е. не запускающий gcc), так как его можно будет запустить в завершившемся PID namespace (где уже fork не работает, правда я не уверен что сработает). и вообще презентовать мою прожку разрабам ядра (linux и др ядра, в том числе создающиеся)
+	// TO.DO: Возможно, объединить все способы mini в одну полезную утилиту с кучей применений (возможно, с облегчёнными вариантами для железа, например, хотя, возможно, для железа и модельные подойдут). А отдельные способы - для примеров. Единая полезная утилита может failback-иться между способами, переключаться как-нибудь
 
 	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: я хотел добавить простой встроенный интерпретатор, мега-портируемый, в том числе на голое железо, умеющий лишь вызывать функции из hard-coded списка функций, но передумал, так как gdb круче
+		// TO.DO: Кстати, портануть mini на голое железо. Это будет отличным делом для изучающих x86 (и любые другие архитектуры). Не нужно ребутиться, чтоб посмотреть результат, можно прогать прямо на самом железе
 
 	// TO.DO: Docs: ОБЯЗАТЕЛЬНО: я хотел добавить glibc://dlfcn/eval.c-подобный, gdb-подобный интерфейс, встроенный простой интерпретатор, умеющий лишь вызывать функции, но произвольные, но передумал, так как дублируется gdb
 
 // TO.DO внедрить все фичи c-repl (docs: спасибо за идею, ссылка; и вообще перечислить в доках альтернативы: gdb, perl и т д)
-// TO.DO C-REPL UNDOCUMENTED: давать функциям имена, чтобы из следующих функций их можно было вызывать
+	// TO.DO: написать автору c-repl?
+	// Подключение либы по имени, а не по пути (напр., -lm и т д)
+// TO.DO C-REPL UNDOCUMENTED: давать функциям (т. е. командам на языке си, набираемым в mini) имена, чтобы из следующих функций их можно было вызывать
 // TO.DO: Docs: протестировано на GNU/Linux'е и FreeBSD (TO.DO: надо бы ещё раз протестить, когда прога будет написана)
 	// TO.DO: Docs: если solaris /usr/include/dlfcn.h:66:13: error: expected specifier-qualifier-list before `mapobj_result_t', то:
 	// typedef struct {
@@ -22,29 +35,95 @@
 	//         uint_t            dlm_acnt;
 	//         uint_t            dlm_rcnt;
 	// } Dl_mapinfo_t;
+	// TO.DO: зарепортить как баг в солярисе. или сделать у меня некое подобие fix-includes из gcc
 // TO.DO Docs: W: нужно, чтоб cl был в environment
 // TO.DO Docs: W: всё создаётся в текущей папке, она должна быть доступна, также надо убирать/чистить за mini
 // TO.DO: Docs: рассказать, рассказать, что эти функции предназначены только для отладки и потому они печатают сообщения об ошибках
 // TO.DO Docs: всё запускается в рамках одного процесса, то есть getpid выдаёт одно и то же число. Это главное отличие от простого While-Read-Do-Compile-Run
 // TO.DO Docs: пример простейшего нетката на mini_connect и т д и mini_cat; код можно выдрать и юзать отдельно
-// TO.DO: вкомпилить readline и dl внутрь mini, если это возможно! docs: рассказать, как правильно собирать с либой mini (-lreadline и т д -rdynamic)
+// TO.DO: вкомпилить readline и dl внутрь mini, если это возможно? docs: рассказать, как правильно собирать с либой mini (-lreadline и т д -rdynamic)
 // TO.DO: чистить временные файлы при получении сигнала? Или не надо, т. к. это уменьшит свободу выполняемого кода? Если не чистим, то написать об этом в доках
 // TO.DO Docs: можно слинковать с мини, вызвать из проги мини, из мини обратно прогу и т д. можно вызвать mini из gdb и наоборот. можно законнектиться к процессу при помощи gdb и сделать mini
 // TO.DO Docs: нет, переменные не сохраняются (если это так)
 // TO.DO Docs: ОБЯЗАТЕЛЬНО: этот вопрос был задан дважды! Mini не сохраняет прогу, этого можно добиться с помощью tee. Рассказать, как продолжить с заданного места
 	// TO.DO Docs: но ещё более важный вопрос, который всех интересует: почему переменные не сохраняются между командами?
 // TO.DO: ошибки .i не репортятся и необратимы
+// TO.DO: есть sysdeps/unix/sysv/linux/syscalls.list в сорцах libc
 // TO.DO Docs: пример с fork/exec и с fork в терминале
-// TO.DO: собрать с readline даже под виндой!
 
 // TO.DO: "mini> .p mini_connect("irc.tambov.ru", "7770")
 // $1 = 3
 // mini: errno: Network is unreachable" - mini_connect должен чистить за собой errno (или какое-то другое решение)
 
 // TO.DO: сделать полноценное прогание? Чтоб можно было на ходу создавать функции?
+// TO.DO LATER: переписать основную функцию без #if'ов? например, разбить на две функции? (потому что в the art of unix programming #if-ный стиль раскритикован как ужасный)
+// TO.DO Docs: большой список вещей, которые можно сделать с мини (например, узнать, может ли один зомби быть сыном другого)
+// TO.DO LATER: не распространять mini под GPL, а то она не сможет линковаться со всем подряд? http://en.wikipedia.org/wiki/GPL_linking_exception ?
+// TO.DO Docs: я добавил readline только чтобы можно было запустить mini как /sbin/init. Иначе я б не добавил, потому что программа должна делать одну вещь и делать её хорошо, см. также Program design in the UNIX environment, Rob Poke, Brian W. Kernighan, http://harmful.cat-v.org/cat-v
+// TO.DO LATER: на коробочной убунте precise команда ".p" из под юзера выдаёт: "Cannot attach to process..." (тут большой текст о том, что not permitted)
+// TO.DO LATER: mini должен игнорить ctrl-c и вообще вести себя во всём как шел? написать либу для написания шелов, то есть командных программ?
+	// TO.DO: при получении ctrl-c mini должен завершать текущую команду?
+// TO.DO LATER: а что если я хочу заюзать mini, чтоб проверить, что чувствует процесс, запущенный из shebang'а? и поэтому mini должен игнорить argv? И поэтому он должен получать инфу о fd, используемом как stdin из других источников?
+// TO.DO LATER: document, что команда ";" проверяет, что всё (в том числе все файлы, инклуденные с помощью .i) в порядке? или придумать что-то лучше?
+
+// TO.DO LATER Docs: да хоть юзайте как калькулятор (особенно если не знаете python и т. д., а wolfram - г$но проприетарное): (o_O, в mini работает автодополнение?)
+/*
+Welcome to Mini - C read-eval-print loop. Type `.h' for help. Type `.q' to quit
+mini> .p sqrt(3)
+No symbol "sqrt" in current context.
+mini> .l /lib/libm
+libm-2.11.3.so  libm.so.6       libmemusage.so
+mini> .l /lib/libm.so.6
+mini> .p sqrt(3)
+$1 = 0 // Только не работает ни х%ра
+mini> .q
+*/
+// TO.DO LATER Docs: до хоть сделайте rdinit mini и вызывайте mount(MOVE)
+	// TO.DO LATER Docs: тут хорошо бы, чтобы от gcc не зависел, возможно, надо нормальный интерпретатор сделать
+// TO.DO: а как собрать mini статически? как он тогда будет общаться со своим dynamic линкером?
+// TO.DO: добавить поддержку c++? хотя б сделать так, чтоб из c++ можно было вызывать mini? и кто тогда должен вызываться? gcc или g++?
+// TO.DO Docs: даёт полный контроль над процессом насколько это возможно. "exec bash" не даёт такой контроль, while read do eval не даёт, while(read){ system } не даёт
+// TO.DO: Аргументы к проге никогда не указываются как fd, вместо этого юзаются файлы vs а что, если на target os нет способа типа /proc/self/fd преобразовать fd в файл?
+// TO.DO: именно mini (причём без gcc) отличается от gdb тем, что можно запустить его в init или rdinit и быть уверенным, что набранные в нём сисвызовы в точности первые сисвызовы в user space, что набранные в нём fork'и первые форки. И что не надо запускать rlwrap перед mini (+ rlwrap'а может не быть, его сложно запустить из cmdline ядра, его нужно искать в PATH и т д)
+
+// TO.DO: этот файл ужасен из-за ifdef'ов. Наверное, нужно сделать так: The best method of managing system-specific
+// variants is to follow those same basic principles:
+// define a portable interface to suitably-chosen primi-
+// tives, and then implement different variants of the
+// primitives for different systems. The well-defined
+// interface is the important part: the bulk of the
+// software, including most of the complexity, can be
+// written as a single version using that interface, and
+// can be read and understood in portable terms.
+// -ifdef considered harmful, cat-v.org
+
+// TO.DO: возможность отключать варниги gcc? и вообще воз-ть указывать свою командную строку gcc? в том числе воз-ть отключать надоедливый варнинг о том, что не подключен хидер? отключать его по дефолту? и вообще, может внести в мейнстрим некоторые изменения из моего личного патча либо контролировать их аргументами командной строки или метакомандами?
+
+// TO.DO: что делать, когда юзер запускает exit/fork/exec и т д? как удалять временные файлы и т д?
+
+// TO.DO: сделать так, чтоб mini полностью подходил для init'а. Например, повесить обработчик SIGCHLD (можно verbose'ный, можно не только для init'а)
+// TO.DO: добавить метакоманды для смены st.in, out и err? и вообще всё переписать, чтобы не забыть добавить метакоманды на все случаи жизни?
+	// TO.DO: сделать все фичи доступными в виде метакомманд, опций командной строки и API. хотя, может, метакоманды не надо и вместо этого можно просто из mini вызывать API типа такого:
+	// # mini
+	// mini> mini_eval("printf(\"Hi\")")
+	// mini> mini_help()
+	// поэтому добавить возможность вызывать mini API отовсюду, в том числе и из интерпретатора с жёстким набором функций и голого железа?
+	// можно написать метакоманды для смены lazy/now mode
+// TO.DO изучить c interpreter из последнего Research UNIX. и из plan 9, если он там есть
+// TO.DO Docs: Б%$, разве вам никогда не хотелось из одной функции одной прожки вызвать функцию другой? Почему раньше никто не додумался сделать _командный интерфейс к dynamic линкеру_? Вот, например, мне в д/з по численном методе понадобилось вызвать функцию из matrix-framework. Берём, компилим прожки как C (C++ почему-то не вышло) с -shared -fPIC -rdynamic (не уверен, что всё надо), и вызываем всё из mini (или наоброт, из одной прожки mini, а из mini - другую). Б%^, да mini как клей, с помощью которого можно склеить всё чё угодно со всем, что угодно
+	// TO.DO: как из gdb сделать dlopen? и как это сделать, если прожка собрана без -ldl? Может, интерфейс к своему динамик линкеру всё равно есть?
+		// p __libc_dlopen_mode("/usr/lib/x86_64-linux-gnu/libm.so", 0x102), 0x102 - это RTLD_NOW | RTLD_GLOBAL
+// TO.DO Docs: а ещё с помощью mini можно потрогать какую-нибудь либу
+// TO.DO Конкурент :( "gdb $SHELL $$"
+// TO.DO Docs: gcc-вариант mini - это, оказывается, jit
+	// TO.DO может, сделать настоящий jit?
+// TO.DO: хороший тест: mini_eval(mini_eval(printf(Hello, world)))
+
+// TO.DO W: не компилить mini как c++, а то, например, не получится сделать её сишной либой?
+// TO.DO W: есть папка mini-tools:///mini-windows, там лежит старая версия mini, которая, скорее всего, работает на винде
 
 #ifdef __unix__
-# define _POSIX_C_SOURCE 200809L
+# define _POSIX_C_SOURCE 200809L /* Нужно обязательно установить как минимум в 200112L, так как юзаем mkstemp */
 #elif defined(_WIN32)
 # define _UNICODE
 # define UNICODE
@@ -80,7 +159,7 @@
 
 #include "mini.h"
 
-#ifdef __CYGWIN__ /* Cygwin's standard C library (Newlib) doesn't support new standards yet (as 2012), so we need this hack */
+#ifdef __CYGWIN__ /* Cygwin's standard C library (Newlib) doesn't support new standards yet (as on 2012), so we need this hack */
 FILE *fdopen(int fd, const char *mode);
 int mkstemp(char *template);
 int fileno(FILE *stream);
@@ -165,7 +244,7 @@ static void my_warnx(struct state *st, const char *format, ...){
 	vfprintf(st->err, format, ap);
 	va_end(ap);
 
-	putc('\n', st->err);
+	fputc('\n', st->err);
 	fflush(st->err);
 }
 
@@ -199,7 +278,7 @@ int check_errno_func(struct state *st){
 
 static HANDLE load_library(struct state *st, const char *library, int /* bool */ global){
 #ifdef __unix__
-	// RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols
+	// RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols (TODO: точно? проверить везде, с какими флагами вызываются dlopen. Может, может понадобиться загрузить либу, в которой не все зависимости разрешены)
 	void *result = dlopen(library, RTLD_NOW | (global ? RTLD_GLOBAL : RTLD_LOCAL));
 
 	if(my_dlerror(st, "dlopen") == -1){
@@ -223,6 +302,8 @@ static HANDLE load_library(struct state *st, const char *library, int /* bool */
 static int do_eval(struct state *st, const char *code){
 	int result = -1;
 
+	// TO.DO: юзер может сперва набрать .i <...>, и только потом первый раз зайти в do_eval. Тогда возникает баг: список, который тут написан, не попадает в headers
+	// TO.DO: почему сделано именно *(headers) == 0, а не headers == 0?
 	if(*(st->headers) == 0){
 		strcpy(st->headers,
 			"#include <stdio.h>\n"
@@ -240,7 +321,7 @@ static int do_eval(struct state *st, const char *code){
 				int source_fd = mkstemp(source);
 
 				if(source_fd == -1){
-					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or mount tmpfs, for example \".system /bin/mount -o remount,rw /\"; error message", source); /* TO.DO: совет portable? */
+					my_warn(st, "%s: cannot create temporary source file; please try to remount /tmp filesystem read-write or mount tmpfs, for example \".system /bin/mount -o remount,rw /\"; error message", source); /* TO.DO: сделать совет portable? После "error message" my_warn добаляет error message */
 					THROW;
 				}
 
@@ -272,7 +353,8 @@ static int do_eval(struct state *st, const char *code){
 					"__declspec(dllexport) "
 #endif
 					"void mini_command(void){\n"
-					"%s;\n" /* Я сделал это отдельной строчкой, потому что "code" может начинаться на "//" */
+					"%s\n" /* Я сделал это отдельной строчкой, потому что "code" может начинаться на "//" */
+					";\n" /* А это я сделал отдельной строчкой, потому что code может заканчиваться на // */
 					"}\n", st->headers, code) < 0){
 
 					my_warn(st, "%s: cannot write to temporary source file", source);
@@ -326,7 +408,7 @@ static int do_eval(struct state *st, const char *code){
 			IN /* Shared object file */
 				TRY /* Compiler process */
 #ifdef __unix__
-// TO.DO: fflush всё перед форком и т. д., вывод gcc куда надо
+// TO.DO: fflush всё перед форком и т. д., вывод gcc куда надо (т. е. в нужный fd)
 					pid_t cc = fork();
 
 					/* We cannot use `switch' here because we want THROW to work */
@@ -339,7 +421,9 @@ static int do_eval(struct state *st, const char *code){
 							"-O0", /* Для компиляторов, отличных от gcc. Они могут включать оптимизацию по умолчанию, а это замедляет компиляцию */
 							"-s", /* Аналогично. Возможно, такая опция требуется даже для gcc, я точно не знаю */
 
-							/* Warnings: */ /* TO.DO Docs: тщательно подобраны варнинги и -Werror. Например, printf(5) теперь не вызывает segfault. Остальные варнинги не включены, так как это позволяет чувствовать себя свободно при написании кода */
+							/* Warnings: */ /* TO.DO Docs: тщательно подобраны варнинги и -Werror. Например, printf(5) (это вызов функции, а не man) теперь не вызывает segfault. Остальные варнинги не включены, так как это позволяет чувствовать себя свободно при написании кода */
+							/* TO.DO: включить или нет werror по дефолту? чтоб printf(5) не падало с сегфолтом? */
+							/* Wnonnull, напр.: execvp(0, 0) падает с сегфолтом */
 							st->werror ? "-Werror" : "-shared",
 
 							"-Wformat",
@@ -352,7 +436,7 @@ static int do_eval(struct state *st, const char *code){
 #endif
 							"-o", shared, "-x", "c", source, (char *)0);
 
-						my_warn(st, "cannot run gcc; please make sure you have \"gcc\" in your PATH, for example: \".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\"; error message");
+						my_warn(st, "cannot run gcc; please make sure you have \"gcc\" in your PATH, for example: \".setenv PATH /usr/sbin:/usr/bin:/sbin:/bin\"; error message"); /* После "error message" my_warn добаляет error message */
 						exit(EXIT_FAILURE);
 					}
 #else
@@ -384,7 +468,7 @@ static int do_eval(struct state *st, const char *code){
 					}
 
 					if(! WIFEXITED(status) || WEXITSTATUS(status) != 0){
-						my_warnx(st, "cannot compile");
+						my_warnx(st, "cannot compile"); // TO.DO: добавить пояснение "see наверху вывод компилятора или невозможно запустить компилятор"
 						THROW;
 					}
 #else
@@ -472,10 +556,11 @@ static int do_eval(struct state *st, const char *code){
 				}
 			END /* Shared object file */
 		FINALLY /* Source file */
-			if(remove(source) == -1){
+		// TODO: закомментировано для отладки. в будущем, наверное, добавить опцию, мол, сохранять временные файлы (и как же узнавать их имена?)
+			/*if(remove(source) == -1){
 				my_warn(st, "%s: cannot remove temporary source file", source);
 				THROW;
-			}
+			}*/
 		END /* Source file */
 	STOP_EXCEPTIONS
 
@@ -572,7 +657,7 @@ static int eval(struct state *st, const char *command){
 					my_warnx(st, "usage: .p EXPRESSION");
 				}else{
 					/* TO.DO: errors */
-					/* TO.DO: temporary file */
+					/* TO.DO: temporary file, удалить его */
 					/* TO.DO: перенаправить ввод, вывод и т д */
 					FILE *commands = fopen("/tmp/mini-commands.gdb", "w");
 					fprintf(commands, "attach %d\nprint %s\n", getpid(), expression);
@@ -698,6 +783,9 @@ void mini(FILE *in, FILE *out, FILE *err){
 		fputs("Welcome to Mini - C read-eval-print loop. Type `.h' for help. Type `.q' to quit\n", st.out);
 	}
 
+/* TO.DO Сделать всё unbuffered, на случай, если mini запущен во всяких сокетах? Например, до запуска MPI_Init в mpich-программе */
+/* TO.DO Мож принимать в mini fd, а не FILE? А мож имя файла? */
+/* TO.DO Переписать нормально, т. е. без вложенных if/#ifdef? */
 #ifdef __unix__
 	if(interactive){
 		rl_instream  = st.in;
