@@ -12,7 +12,7 @@ ARFLAGS  = -rv
 all: mini libmini.a
 
 clean:
-	rm -f mini libmini.a *.o
+	rm -f mini libmini.a ./*.o
 
 install: all uninstall
 	mkdir -p $(DESTDIR)$(PREFIX)/bin $(DESTDIR)$(PREFIX)/include $(DESTDIR)$(PREFIX)/lib

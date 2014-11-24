@@ -3,7 +3,7 @@
     Copyright (C) 2012  Askar Safin <safinaskar@mail.ru>
 
     This file is part of the Asarg Library
-    This is snapshot of the library. See lastest version of the library on https://github.com/safinaskar/asarg
+    This is snapshot of the library. See latest version of the library on https://github.com/safinaskar/asarg
 
     The Asarg Library is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by

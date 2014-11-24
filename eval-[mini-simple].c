@@ -3,10 +3,10 @@
  * * UNIX-подобные ОС с компилятором cc и функцией dlopen
  * * Windows с MVC++
  * Протестирован на:
- * * GNU/Linux, gcc 4.7.2
- * * На Windows пока не протестирован :( Но работать должен
+ * * Debian GNU/Linux Wheezy amd64, gcc 4.7.2
+ * * Windows 8 Release Preview x86_64, MVC++ 2010 Express
  * При запуске на Windows cl.exe должен быть в %path%
- * Создаёт файлы library.c и library.so (library.dll) в текущем каталоге
+ * Создаёт файлы library.c и library.so (library.dll) в текущем каталоге (в Windows могут быть созданы ещё файлы)
  * C89
  * Компилировать на GNU/Linux: cc eval.c -ldl
  * Компилировать на Windows: cl eval.c
@@ -47,7 +47,7 @@ void my_dlerror(const char *message){
 void *compile(const char *symbol){
 	void *result;
 
-	if(system("cc -shared -O3 -fPIC -o library.so library.c") != 0){
+	if(system("cc -Wall -Wextra -shared -O3 -fPIC -o library.so library.c") != 0){
 		fprintf(stderr, "system\n");
 		exit(EXIT_FAILURE);
 	}
@@ -96,6 +96,8 @@ void *compile(const char *symbol){
 		fprintf(stderr, "GetProcAddress\n");
 		exit(EXIT_FAILURE);
 	}
+
+	return result;
 }
 
 void clean_up(void){
@@ -107,7 +109,7 @@ void clean_up(void){
 #endif
 
 void eval(const char *code){
-	void (*evaluating)(void);
+	void (*compiled)(void); /* Это объявление переменной типа указатель на функцию */
 
 	FILE *fout = fopen("library.c", "w");
 
@@ -118,7 +120,7 @@ void eval(const char *code){
 
 	fprintf(fout,
 		"#include <stdio.h>\n"
-		DECLSPEC "void evaluating(void){\n"
+		DECLSPEC "void compiled(void){\n"
 		"%s\n"
 		";\n"
 		"}\n",
@@ -126,13 +128,15 @@ void eval(const char *code){
 
 	fclose(fout);
 
-	*(void **)&evaluating = compile("evaluating");
+	/* См. http://pubs.opengroup.org/onlinepubs/009695399/functions/dlsym.html , раздел "Application Usage" */
+	*(void **)&compiled = compile("compiled"); /* Теперь в переменной compiled лежит указатель на функцию compiled */
 
-	(*evaluating)();
+	(*compiled)(); /* Вызываем функцию, на которую указывает указатель compiled */
 
 	clean_up();
 }
 
 int main(void){
 	eval("printf(\"Hello, world!\\n\")");
+	return 0;
 }
