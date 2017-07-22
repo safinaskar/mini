@@ -1,0 +1,8 @@
+PACKAGE='safinaskar/mini'
+ARCH='any'
+DEPENDS='safinaskar/libsh'
+BUILD_DEPENDS='prog:cmake:cmake prog:make:make prog:c++:g++'
+LIBS='libc:6 libstdc++:6:libstdc++-6-dev libreadline:7:libreadline-dev'
+INSTALL='[ -e CMakeCache.txt ] && echo "Failed: CMakeCache.txt" && exit 1;'\
+\
+'cd "$BUILD" && cmake -DCMAKE_INSTALL_PREFIX="$PREFIX" "$SRC" && make install'
