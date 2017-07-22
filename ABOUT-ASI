@@ -7,12 +7,12 @@
 
 int main(){
 	int pid = fork();
-	if(pid == 0){
-		for(;;){
-		}
+	if (pid == 0){
+		for (;;)
+			;
 	}
 	kill(pid, 9);
-	wait(0);
+	wait(NULL);
 }
 
 Запустил я эту прогу, посмотрел, изменил немного, снова запустил и т. д. Но понимания не приходило. Хотелось тестовую
@@ -22,20 +22,20 @@ int main(){
 // ВНИМАНИЕ! Это всего лишь пример кода. Естественно, в реальной проге нельзя писать такой вот scanf, а то будет переполнение. Реальный код находится на http://github.com/safinaskar/mini
 int main(){
 	char command[100];
-	while(scanf("%s", command) == 1){
-		if(strcmp(command, "fork") == 0){
+	while (scanf("%s", command) == 1){
+		if (strcmp(command, "fork") == 0){
 			int pid = fork();
-			if(pid == 0){
-				for(;;){
-				}
+			if (pid == 0){
+				for (;;)
+					;
 			}
 			printf("%d\n", pid);
-		}else if(strcmp(command, "kill") == 0){
+		}else if (strcmp(command, "kill") == 0){
 			int pid;
 			scanf("%d", &pid);
 			kill(pid, 9);
-		}else if(strcmp(command, "wait") == 0){
-			wait(0);
+		}else if (strcmp(command, "wait") == 0){
+			wait(NULL);
 		}else{
 			printf("Invalid command\n");
 		}
@@ -113,7 +113,7 @@ setuid'а.
 Что бы я добавил в asi? Во-первых, я бы научил asi самостоятельно парсить системные заголовочные файлы, тогда бы никакие
 конфиги были б не нужны и asi бы поддерживал любой сисвызов, который есть. Во-вторых, сделал бы нормальный синтаксис,
 похожий на си, с поддержкой escape-последовательностей. Например, вместо 'open /etc/fstab 0' надо было бы набрать
-'open("/etc/fstab", 0)'. И вообще сделал бы его интерпретатором си.
+'open("/etc/fstab", O_RDONLY)'. И вообще сделал бы его интерпретатором си.
 
 Какие есть альтернативы? Оказывается, в gdb тоже есть встроенный интерпретатор си!
 

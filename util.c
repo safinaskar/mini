@@ -1,43 +1,98 @@
+#define _POSIX_C_SOURCE 200809L /* Because I want to get all poll constants */
+
 #include <stdio.h>
-#include <stdlib.h>
 
-#include <unistd.h>
+#include <poll.h>
 
-#define BUF_SIZE (32 * 1024) // Buffer size for file copying. 32 KiB because Gnulib module `copy-file' uses this size
+struct int_str
+{
+  int i;
+  const char *s;
+};
 
-/* ^_^ */
+static void
+print_ored (struct int_str vals[], int val)
+{
+  int print_pipe = 0;
+  int remains = val;
 
-// TO.DO: Не работает с сокетами/небл. сокетами и т д
-/* Написано на C89, чтобы можно было легко копировать куда-нибудь */
-int mini_cat(int src, int dest){
-	for(;;){
-		char buf[BUF_SIZE];
-		ssize_t size;
-		ssize_t write_result;
+  for (int i = 0; vals[i].s != NULL; ++i)
+    {
+      if (vals[i].i == 0)
+        {
+          continue;
+        }
 
-		size = read(src, buf, BUF_SIZE);
+      if (~(val | ~vals[i].i) == 0)
+        {
+          if (print_pipe)
+            {
+              printf (" | ");
+            }
+          else
+            {
+              print_pipe = 1;
+            }
 
-		if(size == 0){
-			break;
-		}
+          printf ("%s", vals[i].s);
 
-		if(size == -1){
-			perror("mini: mini_cat: read(...) failed");
-			return -1;
-		}
+          remains &= ~vals[i].i;
+        }
+    }
 
-		write_result = write(dest, buf, size);
+  if (remains == 0)
+    {
+      if (!print_pipe)
+        {
+          printf ("0");
+        }
+    }
+  else
+    {
+      if (print_pipe)
+        {
+          printf (" | ");
+        }
 
-		if(write_result == -1){
-			perror("mini: mini_cat: write(...) failed");
-			return -1;
-		}
+      printf ("%d", remains);
+    }
+}
 
-		if(write_result != size){
-			fprintf(stderr, "mini: mini_cat: write(...): data is written partially\n");
-			return -1;
-		}
-	}
+#define IS(i) {i, #i}
 
-	return 0;
+void
+mini_poll (struct pollfd fds[], nfds_t nfds, int timeout)
+{
+  struct int_str poll_ored[] = {
+    IS (POLLIN),
+    IS (POLLRDNORM),
+    IS (POLLRDBAND),
+    IS (POLLPRI),
+    IS (POLLOUT),
+    IS (POLLWRNORM),
+    IS (POLLWRBAND),
+    IS (POLLERR),
+    IS (POLLHUP),
+    IS (POLLNVAL),
+    {0}
+  };
+
+  int result = poll (fds, nfds, timeout);
+
+  if (result == -1)
+    {
+      perror ("mini: mini_poll: poll (...) failed");
+      return;
+    }
+
+  printf ("poll (...) = %d\n", result);
+
+  for (nfds_t i = 0; i != nfds; ++i)
+    {
+      printf ("fds[%d] = {fd = %d, events = ", (int)i, fds[i].fd);
+      print_ored (poll_ored, fds[i].events);
+      printf (", revents = ");
+      print_ored (poll_ored, fds[i].revents);
+      printf ("}\n");
+    }
 }

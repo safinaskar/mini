@@ -1,5 +1,1 @@
-*.o
-*.a
-*.kate-swp
-
-/mini
+.*.kate-swp

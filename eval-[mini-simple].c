@@ -5,6 +5,7 @@
  * Протестирован на:
  * * Debian GNU/Linux Wheezy amd64, gcc 4.7.2
  * * Windows 8 Release Preview x86_64, MVC++ 2010 Express
+ * * MacOS X (почему-то понадобилось вручную установить макрос __unix__)
  * При запуске на Windows cl.exe должен быть в %path%
  * Создаёт файлы library.c и library.so (library.dll) в текущем каталоге (в Windows могут быть созданы ещё файлы)
  * C89
@@ -35,108 +36,122 @@
 
 void *library;
 
-void my_dlerror(const char *message){
-	char *error = (char *)dlerror(); /* OpenBSD's dlerror returns `const char *', so we need to convert */
+void my_dlerror(const char *message)
+{
+  char *error = (char *)dlerror(); /* OpenBSD's dlerror returns "const char *", so we need to convert */
 
-	if(error != 0){
-		fprintf(stderr, "%s: %s\n", message, error);
-		exit(EXIT_FAILURE);
-	}
+  if (error != NULL)
+    {
+      fprintf(stderr, "%s: %s\n", message, error);
+      exit (EXIT_FAILURE);
+    }
 }
 
-void *compile(const char *symbol){
-	void *result;
+void *compile(const char *symbol)
+{
+  void *result;
 
-	if(system("cc -Wall -Wextra -shared -O3 -fPIC -o library.so library.c") != 0){
-		fprintf(stderr, "system\n");
-		exit(EXIT_FAILURE);
-	}
+  if (system("cc -Wall -Wextra -shared -O3 -fPIC -o library.so library.c") != 0)
+    {
+      fprintf(stderr, "system\n");
+      exit (EXIT_FAILURE);
+    }
 
-	/* RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols */
-	library = dlopen("./library.so", RTLD_NOW | RTLD_LOCAL);
+  /* RTLD_NOW, так как я не хочу, чтобы программа падала при undefined symbols */
+  library = dlopen("./library.so", RTLD_NOW | RTLD_LOCAL);
 
-	my_dlerror("dlopen");
+  my_dlerror("dlopen");
 
-	result = dlsym(library, symbol);
+  result = dlsym(library, symbol);
 
-	my_dlerror("dlsym");
+  my_dlerror("dlsym");
 
-	return result;
+  return result;
 }
 
-void clean_up(void){
-	dlclose(library);
+void clean_up(void)
+{
+  dlclose(library);
 
-	my_dlerror("dlclose");
+  my_dlerror("dlclose");
 }
 #else
 # define DECLSPEC "__declspec(dllexport) "
 
 HMODULE library;
 
-void *compile(const char *symbol){
-	void *result;
+void *compile(const char *symbol)
+{
+  void *result;
 
-	if(system("cl /LD /nologo /Felibrary library.c") != 0){
-		fprintf(stderr, "system\n");
-		exit(EXIT_FAILURE);
-	}
+  if (system("cl /LD /nologo /Felibrary library.c") != 0)
+    {
+      fprintf(stderr, "system\n");
+      exit (EXIT_FAILURE);
+    }
 
-	/* LoadLibrary(LPCTSTR); */
-	library = LoadLibrary(TEXT(".\\library.dll"));
+  /* LoadLibrary(LPCTSTR); */
+  library = LoadLibrary(TEXT(".\\library.dll"));
 
-	if(library == 0){
-		fprintf(stderr, "LoadLibrary\n");
-		exit(EXIT_FAILURE);
-	}
+  if (library == 0)
+    {
+      fprintf(stderr, "LoadLibrary\n");
+      exit (EXIT_FAILURE);
+    }
 
-	result = GetProcAddress(library, symbol);
+  result = GetProcAddress(library, symbol);
 
-	if(result == 0){
-		fprintf(stderr, "GetProcAddress\n");
-		exit(EXIT_FAILURE);
-	}
+  if (result == NULL)
+    {
+      fprintf(stderr, "GetProcAddress\n");
+      exit (EXIT_FAILURE);
+    }
 
-	return result;
+  return result;
 }
 
-void clean_up(void){
-	if(!FreeLibrary(library)){
-		fprintf(stderr, "FreeLibrary\n");
-		exit(EXIT_FAILURE);
-	}
+void clean_up(void)
+{
+  if (!FreeLibrary(library))
+    {
+      fprintf(stderr, "FreeLibrary\n");
+      exit (EXIT_FAILURE);
+    }
 }
 #endif
 
-void eval(const char *code){
-	void (*compiled)(void); /* Это объявление переменной типа указатель на функцию */
+void eval(const char *code)
+{
+  void (*compiled)(void); /* Это объявление переменной типа указатель на функцию */
 
-	FILE *fout = fopen("library.c", "w");
+  FILE *fout = fopen("library.c", "w");
 
-	if(fout == 0){
-		perror("fopen");
-		exit(EXIT_FAILURE);
-	}
+  if (fout == NULL)
+    {
+      perror("fopen");
+      exit (EXIT_FAILURE);
+    }
 
-	fprintf(fout,
-		"#include <stdio.h>\n"
-		DECLSPEC "void compiled(void){\n"
-		"%s\n"
-		";\n"
-		"}\n",
-		code);
+  fprintf(fout,
+    "#include <stdio.h>\n"
+    DECLSPEC "void compiled(void){\n"
+    "%s\n"
+    ";\n"
+    "}\n",
+    code);
 
-	fclose(fout);
+  fclose(fout);
 
-	/* См. http://pubs.opengroup.org/onlinepubs/009695399/functions/dlsym.html , раздел "Application Usage" */
-	*(void **)&compiled = compile("compiled"); /* Теперь в переменной compiled лежит указатель на функцию compiled */
+  /* См. http://pubs.opengroup.org/onlinepubs/009695399/functions/dlsym.html , раздел "Application Usage" */
+  *(void **)&compiled = compile("compiled"); /* Теперь в переменной compiled лежит указатель на функцию compiled */
 
-	(*compiled)(); /* Вызываем функцию, на которую указывает указатель compiled */
+  (*compiled)(); /* Вызываем функцию, на которую указывает указатель compiled */
 
-	clean_up();
+  clean_up();
 }
 
-int main(void){
-	eval("printf(\"Hello, world!\\n\")");
-	return 0;
+int main(void)
+{
+  eval("printf(\"Hello, world!\\n\")");
+  exit (EXIT_SUCCESS);
 }
