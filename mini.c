@@ -626,6 +626,7 @@ static void help(struct state *st)
 static void sighandler(int signum)
 {
   fprintf(stdout, "mini: got signal %d\n", signum);
+  signal(signum, &sighandler);
 }
 
 static int eval(struct state *st, const char *command)
